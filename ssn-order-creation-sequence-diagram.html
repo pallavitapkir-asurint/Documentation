@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSN Order Creation – Full End-to-End Flow</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #21263a;
+    --border: #2e3350;
+    --accent: #5b8ef0;
+    --accent2: #7c5bf0;
+    --accent3: #f05b8e;
+    --accent4: #5bf0c0;
+    --accent5: #f0c05b;
+    --accent6: #f07a5b;
+    --accent7: #5bf05b;
+    --text: #e0e4f0;
+    --text-muted: #8890b0;
+    --tag-ui: #1a3a5c;
+    --tag-ui-border: #3a7abf;
+    --tag-ui-text: #5bc8f0;
+    --tag-asurint: #2a1a5c;
+    --tag-asurint-border: #7a3abf;
+    --tag-asurint-text: #b05bf0;
+    --tag-reports: #1a3a2a;
+    --tag-reports-border: #3abf7a;
+    --tag-reports-text: #5bf0a0;
+    --tag-lexis: #3a2a1a;
+    --tag-lexis-border: #bf7a3a;
+    --tag-lexis-text: #f0a05b;
+    --tag-orders: #3a1a2a;
+    --tag-orders-border: #bf3a7a;
+    --tag-orders-text: #f05ba0;
+    --tag-kafka: #1a2a3a;
+    --tag-kafka-border: #3a7a9f;
+    --tag-kafka-text: #5bb0f0;
+    --tag-db: #2a2a1a;
+    --tag-db-border: #9f9f3a;
+    --tag-db-text: #f0f05b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.6; }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 280px; min-width: 280px; background: var(--surface); border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 20px 0; }
+  .main { flex: 1; padding: 32px 40px; max-width: 1200px; }
+
+  /* Sidebar */
+  .sidebar-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 0 20px 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .sidebar-phase { padding: 4px 20px; }
+  .sidebar-phase a { color: var(--text-muted); text-decoration: none; font-size: 12px; display: flex; align-items: center; gap: 8px; padding: 4px 0; transition: color 0.2s; }
+  .sidebar-phase a:hover { color: var(--text); }
+  .sidebar-phase a .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sidebar-legend { padding: 16px 20px 8px; border-top: 1px solid var(--border); margin-top: 16px; }
+  .sidebar-legend-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; }
+
+  /* Page title */
+  .page-title { font-size: 26px; font-weight: 700; margin-bottom: 6px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .page-subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
+
+  /* Service tag badges */
+  .tag { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 2px 7px; border-radius: 4px; margin-right: 6px; white-space: nowrap; vertical-align: middle; }
+  .tag-ui { background: var(--tag-ui); border: 1px solid var(--tag-ui-border); color: var(--tag-ui-text); }
+  .tag-asurint { background: var(--tag-asurint); border: 1px solid var(--tag-asurint-border); color: var(--tag-asurint-text); }
+  .tag-reports { background: var(--tag-reports); border: 1px solid var(--tag-reports-border); color: var(--tag-reports-text); }
+  .tag-lexis { background: var(--tag-lexis); border: 1px solid var(--tag-lexis-border); color: var(--tag-lexis-text); }
+  .tag-orders { background: var(--tag-orders); border: 1px solid var(--tag-orders-border); color: var(--tag-orders-text); }
+  .tag-kafka { background: var(--tag-kafka); border: 1px solid var(--tag-kafka-border); color: var(--tag-kafka-text); }
+  .tag-db { background: var(--tag-db); border: 1px solid var(--tag-db-border); color: var(--tag-db-text); }
+
+  /* Phase section */
+  .phase { margin-bottom: 40px; }
+  .phase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .phase-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .phase-title-wrap h2 { font-size: 18px; font-weight: 700; }
+  .phase-title-wrap p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Step cards */
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; position: relative; }
+  .step:hover { border-color: var(--accent); background: var(--surface2); }
+  .step-header { display: flex; align-items: flex-start; gap: 12px; }
+  .step-num { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; margin-top: 1px; }
+  .step-content { flex: 1; }
+  .step-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .step-desc { color: var(--text-muted); font-size: 13px; margin-bottom: 6px; }
+  .step-file { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: 11px; font-family: 'Consolas', 'Courier New', monospace; color: #c0caf5; margin: 2px 2px 2px 0; }
+  .step-file .tag { margin-right: 0; }
+  .step-arrow { display: flex; align-items: center; color: var(--text-muted); padding: 4px 0 4px 40px; font-size: 12px; }
+  .step-arrow::before { content: '↓'; margin-right: 8px; color: var(--accent); }
+
+  /* Code block */
+  .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 11px; line-height: 1.7; overflow-x: auto; }
+  .code-block .kw { color: #ff79c6; }
+  .code-block .str { color: #f1fa8c; }
+  .code-block .fn { color: #50fa7b; }
+  .code-block .cm { color: #6272a4; }
+  .code-block .ty { color: #8be9fd; }
+  .code-block .num { color: #bd93f9; }
+
+  /* Detail list */
+  .detail-list { margin-top: 8px; padding-left: 0; list-style: none; }
+  .detail-list li { color: var(--text-muted); font-size: 12px; padding: 2px 0 2px 16px; position: relative; }
+  .detail-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent); }
+
+  /* HTTP badge */
+  .http-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(91,142,240,0.12); border: 1px solid var(--accent); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: monospace; color: var(--accent); margin-top: 6px; }
+
+  /* Kafka badge */
+  .kafka-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(91,176,240,0.12); border: 1px solid var(--tag-kafka-border); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: monospace; color: var(--tag-kafka-text); margin-top: 6px; }
+
+  /* Info box */
+  .info-box { background: rgba(91,142,240,0.08); border: 1px solid rgba(91,142,240,0.3); border-radius: 8px; padding: 12px 14px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+  .info-box strong { color: var(--text); }
+
+  /* Architecture card */
+  .arch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; }
+  .arch-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .arch-card-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .arch-card-tech { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+  .arch-card-role { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .arch-card-topics { font-size: 11px; font-family: monospace; color: var(--tag-kafka-text); }
+
+  /* Middleware chain */
+  .mw-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+  .mw-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: monospace; color: var(--accent4); }
+  .mw-arrow { color: var(--accent); font-size: 14px; }
+
+  /* Apollo link chain */
+  .link-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+  .link-item { background: rgba(124,91,240,0.12); border: 1px solid var(--accent2); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: monospace; color: #c0a0f8; }
+
+  /* Inline note */
+  .note { font-size: 11px; color: var(--accent5); background: rgba(240,192,91,0.08); border: 1px solid rgba(240,192,91,0.25); border-radius: 5px; padding: 4px 8px; margin-top: 6px; display: inline-block; }
+
+  /* connector line between steps */
+  .connector { width: 2px; height: 16px; background: linear-gradient(to bottom, var(--border), transparent); margin-left: 53px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media(max-width: 900px) {
+    .sidebar { display: none; }
+    .main { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ===== SIDEBAR ===== -->
+<nav class="sidebar">
+  <div class="sidebar-title">SSN Order Flow</div>
+
+  <div class="sidebar-phase"><a href="#phase0"><span class="dot" style="background:#5bc8f0"></span>Phase 0 — Browser & UI Setup</a></div>
+  <div class="sidebar-phase"><a href="#phase1"><span class="dot" style="background:#5bc8f0"></span>Phase 1 — UI: Package Selection</a></div>
+  <div class="sidebar-phase"><a href="#phase2"><span class="dot" style="background:#5bc8f0"></span>Phase 2 — UI: SSN Input</a></div>
+  <div class="sidebar-phase"><a href="#phase3"><span class="dot" style="background:#5bc8f0"></span>Phase 3 — UI: Mutation Dispatch</a></div>
+  <div class="sidebar-phase"><a href="#phase4"><span class="dot" style="background:#b05bf0"></span>Phase 4 — asurint-api: Middleware</a></div>
+  <div class="sidebar-phase"><a href="#phase5"><span class="dot" style="background:#b05bf0"></span>Phase 5 — asurint-api: Auth & JWT</a></div>
+  <div class="sidebar-phase"><a href="#phase6"><span class="dot" style="background:#b05bf0"></span>Phase 6 — asurint-api: Schema Stitch</a></div>
+  <div class="sidebar-phase"><a href="#phase7"><span class="dot" style="background:#b05bf0"></span>Phase 7 — asurint-api → reports-api</a></div>
+  <div class="sidebar-phase"><a href="#phase8"><span class="dot" style="background:#5bf0a0"></span>Phase 8 — reports-api: GraphQL</a></div>
+  <div class="sidebar-phase"><a href="#phase9"><span class="dot" style="background:#5bf0a0"></span>Phase 9 — reports-api: Controller</a></div>
+  <div class="sidebar-phase"><a href="#phase10"><span class="dot" style="background:#5bf0a0"></span>Phase 10 — reports-api: Camunda</a></div>
+  <div class="sidebar-phase"><a href="#phase11"><span class="dot" style="background:#5bf0a0"></span>Phase 11 — reports-api: BPMN Steps</a></div>
+  <div class="sidebar-phase"><a href="#phase12"><span class="dot" style="background:#f0a05b"></span>Phase 12 — lexisnexis-service</a></div>
+  <div class="sidebar-phase"><a href="#phase13"><span class="dot" style="background:#f0a05b"></span>Phase 13 — Accurint SOAP Call</a></div>
+  <div class="sidebar-phase"><a href="#phase14"><span class="dot" style="background:#5bf05b"></span>Phase 14 — Response Propagation</a></div>
+  <div class="sidebar-phase"><a href="#arch"><span class="dot" style="background:#8890b0"></span>Microservice Architecture Map</a></div>
+
+  <div class="sidebar-legend">
+    <div class="sidebar-legend-title">Microservice Legend</div>
+    <div class="legend-item"><span class="tag tag-ui">ui</span> React/TypeScript Frontend</div>
+    <div class="legend-item"><span class="tag tag-asurint">asurint-api</span> Node.js GraphQL Gateway</div>
+    <div class="legend-item"><span class="tag tag-reports">reports-api</span> Kotlin/Spring Boot</div>
+    <div class="legend-item"><span class="tag tag-lexis">lexisnexis</span> Kotlin SOAP Client</div>
+    <div class="legend-item"><span class="tag tag-orders">orders-svc</span> Camunda Orchestrator</div>
+    <div class="legend-item"><span class="tag tag-kafka">kafka</span> Avro Message Bus</div>
+    <div class="legend-item"><span class="tag tag-db">db</span> PostgreSQL / Redis</div>
+  </div>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+  <div class="page-title">SSN Order Creation — End-to-End Flow</div>
+  <div class="page-subtitle">Complete trace from browser click → UI → asurint-api gateway → reports-api → Camunda BPMN → Kafka → lexisnexis-service → Accurint SOAP → response. Every code file labeled with its owning microservice.</div>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 0 ═══ -->
+  <section class="phase" id="phase0">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,200,240,0.15);border:2px solid var(--tag-ui-border);color:var(--tag-ui-text)">0</div>
+      <div class="phase-title-wrap">
+        <h2>Browser & UI Bootstrap</h2>
+        <p>React app loads, Apollo client initialised, Okta token extracted from localStorage</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> User navigates to <code>/orders/create</code></div>
+            <div class="step-desc">React Router matches the route and renders the <code>CreateReport</code> page component.</div>
+            <div><span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/routes/Reports.tsx</span></div>
+            <div class="code-block"><span class="cm">// Route mapping in Reports.tsx</span>
+&lt;<span class="ty">Route</span> path=<span class="str">"/orders/create"</span> element=&#123;&lt;<span class="ty">CreateReport</span> /&gt;&#125; /&gt;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> Apollo Client instantiation</div>
+            <div class="step-desc">On app mount, Apollo Client is created. It reads the Okta access token from <code>localStorage</code> and attaches it as a Bearer header on every GraphQL request.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/hooks/setupApolloClient.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// setupApolloClient.ts — token extraction</span>
+<span class="kw">const</span> raw = <span class="fn">localStorage</span>.getItem(<span class="str">"okta-token-storage"</span>);
+<span class="kw">const</span> parsed = <span class="ty">JSON</span>.parse(raw);
+<span class="kw">const</span> accessToken = parsed?.accessToken?.accessToken;   <span class="cm">// Okta JWT string</span>
+
+<span class="cm">// Apollo InMemoryCache + ApolloLink authLink</span>
+<span class="kw">new</span> <span class="ty">ApolloClient</span>(&#123;
+  uri: <span class="str">`$&#123;ASURINT_API_BASE_URL&#125;/public/graphql`</span>,
+  headers: &#123;
+    <span class="str">"Authorization"</span>: <span class="str">`Bearer $&#123;accessToken&#125;`</span>,
+    <span class="str">"asurint-client-name"</span>: <span class="str">"client-ui"</span>,
+    <span class="str">"is-proxy-user"</span>: isProxyUser ? <span class="str">"true"</span> : <span class="str">"false"</span>,
+    <span class="str">"refresh-cache"</span>: refreshCache ? <span class="str">"true"</span> : <span class="str">"false"</span>
+  &#125;
+&#125;)</div>
+            <ul class="detail-list">
+              <li>Target endpoint: <code>https://&lt;ASURINT_API_BASE_URL&gt;/public/graphql</code></li>
+              <li>Token sourced from Okta-managed <code>localStorage</code> key <code>"okta-token-storage"</code></li>
+              <li>Extra headers: <code>asurint-client-name: "client-ui"</code>, <code>is-proxy-user</code>, <code>refresh-cache</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 1 ═══ -->
+  <section class="phase" id="phase1">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,200,240,0.15);border:2px solid var(--tag-ui-border);color:var(--tag-ui-text)">1</div>
+      <div class="phase-title-wrap">
+        <h2>UI — Package Selection & Form Render</h2>
+        <p>User selects a screening package; React state machines route to SSN entry form</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> <code>CreateReport</code> component mounts</div>
+            <div class="step-desc">Top-level page component. Uses <code>useReducer</code> + <code>CreateReportContext</code> to manage multi-step wizard state: package selection → candidate info → order submission.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/pages/CreateReport/view.tsx</span>
+            </div>
+            <ul class="detail-list">
+              <li>Renders step sequence: <strong>SelectPackage</strong> → <strong>CandidateInformation</strong> → <strong>EnterDetailsForm | SendToCandidateForm</strong></li>
+              <li>Redux store slice: <code>createReport</code> — holds orgUnit, package, reportNumber, isDraftOrder, ssn</li>
+            </ul>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/stores/Reports/createReport</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> Candidate Information tabs render</div>
+            <div class="step-desc">After package selection, two paths are offered: <strong>"Enter Details"</strong> (employer enters SSN directly) or <strong>"Send to Candidate"</strong> (candidate fills their own data).</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/pages/CreateReport/components/CandidateInformation/view.tsx</span>
+            </div>
+            <ul class="detail-list">
+              <li>Tab "Enter Details" → routes to <code>EnterDetailsForm</code> (SSN path)</li>
+              <li>Tab "Send to Candidate" → routes to <code>SendToCandidateForm</code> (candidateDirect path)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 2 ═══ -->
+  <section class="phase" id="phase2">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,200,240,0.15);border:2px solid var(--tag-ui-border);color:var(--tag-ui-text)">2</div>
+      <div class="phase-title-wrap">
+        <h2>UI — SSN Field Input & Validation</h2>
+        <p>Employer types SSN; masking, validation, and form-state wiring</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> <code>EnterDetailsForm</code> renders SSNField</div>
+            <div class="step-desc">The "Enter Details" tab renders a Formik-backed form. The <code>SSNField</code> class component handles all SSN input behaviour.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/pages/CreateReport/components/EnterDetailsForm/view.tsx</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/pages/CreateReport/components/EnterDetailsForm/form.ts</span>
+            </div>
+            <ul class="detail-list">
+              <li>Formik initial values include: <code>ssn, firstName, lastName, dateOfBirth, addresses, aliases, driverLicenses, educationVerifications, employmentVerifications</code></li>
+              <li>Renders "Has No SSN" checkbox — if checked, SSN field is hidden and form switches to name-only path</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">6</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> <code>SSNField</code> component — masking & validation</div>
+            <div class="step-desc">Class component that wraps the raw <code>&lt;input id="ssn-masked-input"&gt;</code>. Implements real-time masking, dot-masking for display, and fires a callback when 9 digits are entered.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/components/SSN/view.tsx</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/components/SSN/handlers.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// handlers.ts</span>
+<span class="fn">applyMask</span>(value: <span class="ty">string</span>): <span class="ty">string</span>   <span class="cm">// formats → XXX-XX-XXXX</span>
+<span class="fn">addDots</span>(value: <span class="ty">string</span>): <span class="ty">string</span>      <span class="cm">// displays → ***-**-1234 (last 4 visible)</span>
+<span class="fn">handleKeyDown</span>(e)                    <span class="cm">// blocks non-numeric input</span>
+<span class="fn">onValidSSN</span>()                        <span class="cm">// fires when 9 digits complete</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 3 ═══ -->
+  <section class="phase" id="phase3">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,200,240,0.15);border:2px solid var(--tag-ui-border);color:var(--tag-ui-text)">3</div>
+      <div class="phase-title-wrap">
+        <h2>UI — GraphQL Mutation Dispatch</h2>
+        <p>Form submit builds CreateReport mutation and POSTs to asurint-api</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">7</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> Form submit → <code>createOrder(form)</code></div>
+            <div class="step-desc">On form submit, the <code>createOrder</code> function (in EnterDetailsForm hooks) builds the <code>CreateReportInput</code> variable object from Formik state.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/pages/CreateReport/components/EnterDetailsForm/hooks.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// hooks.ts — lines 963–1066: createOrder()</span>
+<span class="kw">const</span> variables = &#123;
+  reportRequest: &#123;
+    orgUnitId: state.orgUnit.id,
+    packageId: state.selectedPackage.id,
+    candidateProfile: &#123;
+      <span class="kw">new</span>: &#123;
+        ssnOnly: &#123; ssn: form.ssn &#125;   <span class="cm">// ← SSN-only path</span>
+        <span class="cm">// OR: candidateDirect: &#123; firstName, lastName, emailAddress, phoneNumber &#125;</span>
+      &#125;
+    &#125;
+  &#125;
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">8</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> <code>useMutation(CREATE_REPORT)</code> fires</div>
+            <div class="step-desc">Apollo Client executes the mutation. The <code>CREATE_REPORT</code> document is defined in the shared GraphQL index file.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/graphql/Reports/index.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// index.ts — lines 109–126</span>
+<span class="kw">const</span> CREATE_REPORT = <span class="fn">gql</span>`
+  <span class="kw">mutation</span> <span class="fn">CreateReport</span>(<span class="num">$reportRequest</span>: <span class="ty">CreateReportInput</span>!) &#123;
+    createReport(reportRequest: <span class="num">$reportRequest</span>) &#123;
+      status
+      reportNumber
+      receivedOn
+      dueOn
+      subject &#123; name &#123; firstName middleName lastName suffix &#125; &#125;
+    &#125;
+  &#125;
+`</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">9</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> HTTP POST leaves the browser</div>
+            <div class="step-desc">Apollo Client serialises the mutation + variables as JSON and makes an HTTP POST request to the asurint-api gateway.</div>
+            <div class="http-badge">POST https://&lt;ASURINT_API_BASE_URL&gt;/public/graphql<br>
+Authorization: Bearer &lt;okta-jwt&gt;<br>
+asurint-client-name: client-ui<br>
+Content-Type: application/json</div>
+            <div class="info-box"><strong>Request body:</strong> <code>&#123; "query": "mutation CreateReport...", "variables": &#123; "reportRequest": &#123; "orgUnitId": "...", "packageId": "...", "candidateProfile": &#123; "new": &#123; "ssnOnly": &#123; "ssn": "XXX-XX-XXXX" &#125; &#125; &#125; &#125; &#125; &#125;</code></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 4 ═══ -->
+  <section class="phase" id="phase4">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(176,91,240,0.15);border:2px solid var(--tag-asurint-border);color:var(--tag-asurint-text)">4</div>
+      <div class="phase-title-wrap">
+        <h2>asurint-api — Express Middleware Chain</h2>
+        <p>Every incoming request traverses a fixed middleware pipeline before reaching Apollo Server</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">10</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> Request arrives at Express app</div>
+            <div class="step-desc">The Node.js Express application receives the POST. The middleware pipeline runs in order before the request reaches the Apollo Server handler.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/index.ts</span>
+            </div>
+            <div class="mw-chain">
+              <span class="mw-item">cors()</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">loggingMiddleware</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">correlationIdMiddleware</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">userAgentMiddleware</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">authenticationMiddleware</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">useServiceProxies</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">bodyParser.json</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">graphqlUploadExpress</span>
+              <span class="mw-arrow">→</span>
+              <span class="mw-item">expressMiddleware(apolloServer)</span>
+            </div>
+            <ul class="detail-list" style="margin-top:10px">
+              <li><strong>cors()</strong> — CORS headers added for browser pre-flight</li>
+              <li><strong>loggingMiddleware</strong> — structured request logging (method, path, status)</li>
+              <li><strong>correlationIdMiddleware</strong> — generates or reads <code>correlation-id</code> UUID; stored on <code>req</code></li>
+              <li><strong>userAgentMiddleware</strong> — captures user-agent string for downstream propagation</li>
+              <li><strong>authenticationMiddleware</strong> — validates Okta JWT (see Phase 5)</li>
+              <li><strong>useServiceProxies</strong> — sets up optional REST proxy routes to reports-api</li>
+              <li><strong>bodyParser.json</strong> — parses JSON body; max 50 MB</li>
+              <li><strong>graphqlUploadExpress</strong> — multipart file upload support</li>
+              <li><strong>expressMiddleware(apolloServer)</strong> — Apollo Server 4 handler</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 5 ═══ -->
+  <section class="phase" id="phase5">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(176,91,240,0.15);border:2px solid var(--tag-asurint-border);color:var(--tag-asurint-text)">5</div>
+      <div class="phase-title-wrap">
+        <h2>asurint-api — Authentication & JWT Re-signing</h2>
+        <p>Okta JWT validated; UserPrincipal built; downstream JWT signed with internal secret</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">11</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> <code>authenticationMiddleware</code> validates Okta JWT</div>
+            <div class="step-desc">Bearer strategy: reads the <code>Authorization</code> header, detects the JWT format, and validates against Okta JWKS endpoint using <code>@okta/jwt-verifier</code>.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/middleware/auth/index.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// auth/index.ts — JWT validation paths</span>
+<span class="kw">if</span> (isAsurintJwtFormat(token)) &#123;
+  <span class="cm">// Internal service JWT — skip Okta, verify with REMOTE_SCHEMA_JWT_SECRET</span>
+&#125; <span class="kw">else if</span> (isOktaIntegrationUser(claims)) &#123;
+  <span class="cm">// Integration user: verify with Okta, fetch org unit from accounts-service</span>
+&#125; <span class="kw">else</span> &#123;
+  <span class="cm">// Regular Okta user: verify with @okta/jwt-verifier</span>
+  <span class="kw">await</span> jwtVerifier.<span class="fn">verifyAccessToken</span>(token, audience);
+&#125;
+
+<span class="cm">// Cache authenticated user 30s to avoid repeated Okta calls</span>
+nodeCache.<span class="fn">set</span>(<span class="str">`$&#123;orgUnitId&#125;:$&#123;emailAddress&#125;`</span>, userPrincipal, <span class="num">30</span>);</div>
+            <ul class="detail-list">
+              <li>Config: <code>OKTA_URL</code>, <code>OKTA_ISSUER</code> from <code>EnvConfiguration.ts</code></li>
+              <li>Sets <code>req.authentication = UserPrincipal &#123; emailAddress, personas, userId, orgUnitId &#125;</code></li>
+              <li>Sets <code>req.headers["x-token"]</code> — a re-signed JWT for downstream use</li>
+              <li>30-second NodeCache keyed on <code>orgUnitId:emailAddress</code></li>
+            </ul>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/config/EnvConfiguration.ts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">12</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> GraphQL context built per request</div>
+            <div class="step-desc">Apollo Server calls <code>buildGraphQLContext(req)</code> to create the per-request context object that flows into all resolvers.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/server/index.ts</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/server/context.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// context.ts — context shape</span>
+&#123;
+  correlationId: req.correlationId,           <span class="cm">// UUID from correlationIdMiddleware</span>
+  authentication: req.authentication,          <span class="cm">// UserPrincipal | null</span>
+  logger: enrichedLogger,                      <span class="cm">// pino logger with user context</span>
+  userAgent: req.headers["user-agent"]
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 6 ═══ -->
+  <section class="phase" id="phase6">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(176,91,240,0.15);border:2px solid var(--tag-asurint-border);color:var(--tag-asurint-text)">6</div>
+      <div class="phase-title-wrap">
+        <h2>asurint-api — Schema Stitching & Resolver Dispatch</h2>
+        <p>Stitched schema merges 17 downstream services; createReport resolver routes to reports-api</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">13</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> Stitched schema resolves <code>createReport</code></div>
+            <div class="step-desc">On startup, asurint-api introspects 17 downstream services and stitches their schemas into one unified GraphQL API. The <code>createReport</code> mutation belongs to the reports-api sub-schema.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/index.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// schemas/index.ts — stitch config (abbreviated)</span>
+<span class="fn">stitchSchemas</span>(&#123;
+  subschemas: [
+    reportsApiSchema,       <span class="cm">// ← createReport lives here</span>
+    accountsServiceSchema,
+    billingServiceSchema,
+    criminalServiceSchema,
+    <span class="cm">// ... 13 more services</span>
+  ],
+  typeDefs: [reportExtensions, candidateExtensions, userExtensions, ...],
+&#125;)</div>
+            <ul class="detail-list">
+              <li>Schemas introspected at startup and cached to <code>introspected_schemas/</code> directory on disk</li>
+              <li>Optional periodic reload: <code>SCHEMA_RELOAD_INTERVAL_SECONDS</code> env var</li>
+              <li>Schema extensions add cross-service computed fields (e.g. report → candidate, billing, etc.)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">14</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> <code>RemoteSchemaBuilder</code> configures reports-api sub-schema</div>
+            <div class="step-desc">Each downstream sub-schema is built with its own Apollo link chain that handles auth, correlation IDs, logging, persona checks, and error transformation before forwarding requests.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/builder/RemoteSchemaBuilder.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// RemoteSchemaBuilder.ts</span>
+<span class="kw">new</span> <span class="ty">RemoteSchemaBuilder</span>()
+  .<span class="fn">withServiceName</span>(<span class="str">"reports-api"</span>)
+  .<span class="fn">withUrl</span>(config => config.services.reports.gqlUrl)  <span class="cm">// REPORTS_API_URL/graphql</span>
+  .<span class="fn">withLinkChain</span>(linkChain)
+  .<span class="fn">build</span>()</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">15</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> Apollo Link chain processes outgoing request</div>
+            <div class="step-desc">Before the HTTP request is sent to reports-api, it traverses the link chain. Each link enriches or validates the request.</div>
+            <div class="link-chain">
+              <span class="link-item">errorLink</span>
+              <span class="mw-arrow">→</span>
+              <span class="link-item">correlationIdLink</span>
+              <span class="mw-arrow">→</span>
+              <span class="link-item">loggingLink</span>
+              <span class="mw-arrow">→</span>
+              <span class="link-item">authLink ⭐</span>
+              <span class="mw-arrow">→</span>
+              <span class="link-item">userAgentLink</span>
+              <span class="mw-arrow">→</span>
+              <span class="link-item">personaCheckingLink</span>
+              <span class="mw-arrow">→</span>
+              <span class="link-item">HttpLink → reports-api</span>
+            </div>
+            <div style="margin-top:10px">
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/errorLink.ts</span>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/correlationIdLink.ts</span>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/loggingLink.ts</span>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/authLink.ts</span>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/userAgentLink.ts</span>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/personaCheckingLink.ts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 7 ═══ -->
+  <section class="phase" id="phase7">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(176,91,240,0.15);border:2px solid var(--tag-asurint-border);color:var(--tag-asurint-text)">7</div>
+      <div class="phase-title-wrap">
+        <h2>asurint-api — authLink JWT Re-signing (Critical)</h2>
+        <p>The Okta JWT is replaced with an internally-signed JWT containing full UserPrincipal</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">16</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> <code>authLink.ts</code> — JWT re-signing ⭐ KEY STEP</div>
+            <div class="step-desc">This is the critical security bridge. The Okta JWT from the browser is discarded. A new JWT is minted using the internal <code>REMOTE_SCHEMA_JWT_SECRET</code> and signed with the full <code>UserPrincipal</code> as the payload. This new JWT is forwarded to reports-api.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-asurint">asurint-api</span>asurint-api/src/apollo/schemas/remote/links/authLink.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// authLink.ts — JWT re-signing</span>
+<span class="kw">const</span> jwtUtil = <span class="kw">new</span> <span class="ty">JWT</span>(<span class="fn">getConfiguration</span>().remoteSchemaJwtSecret);
+
+<span class="cm">// Sign new JWT with full UserPrincipal as payload</span>
+<span class="kw">const</span> newToken = <span class="kw">await</span> jwtUtil.<span class="fn">sign</span>(
+  authentication,              <span class="cm">// UserPrincipal object</span>
+  authentication.emailAddress  <span class="cm">// subject claim</span>
+);
+
+<span class="cm">// Replace Authorization header on outgoing request</span>
+headers[<span class="str">"Authorization"</span>] = <span class="str">`Bearer $&#123;newToken&#125;`</span>;</div>
+            <ul class="detail-list">
+              <li><strong>Why:</strong> reports-api (Kotlin/Spring Boot) cannot validate Okta JWTs. It validates using the shared <code>REMOTE_SCHEMA_JWT_SECRET</code> instead.</li>
+              <li><strong>Payload:</strong> Full <code>UserPrincipal</code> — emailAddress, personas, userId, orgUnitId — embedded in JWT claims</li>
+              <li><strong>Secret source:</strong> <code>REMOTE_SCHEMA_JWT_SECRET</code> env var shared between asurint-api and all downstream Kotlin services</li>
+              <li><strong>Effect:</strong> reports-api receives a trusted internal JWT it can verify without Okta dependency</li>
+            </ul>
+            <div class="note">⭐ The browser never knows about this JWT swap. reports-api trusts asurint-api as its sole gateway.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">17</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> → <span class="tag tag-reports">reports-api</span> HTTP POST forwarded</div>
+            <div class="step-desc">After all link chain processing, HttpLink fires the actual HTTP POST to reports-api with the re-signed JWT.</div>
+            <div class="http-badge">POST https://&lt;REPORTS_API_URL&gt;/graphql<br>
+Authorization: Bearer &lt;internal-jwt&gt;<br>
+correlation-id: &lt;uuid&gt;<br>
+user-agent: &lt;forwarded&gt;<br>
+asurint-client-name: client-ui</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 8 ═══ -->
+  <section class="phase" id="phase8">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,240,160,0.12);border:2px solid var(--tag-reports-border);color:var(--tag-reports-text)">8</div>
+      <div class="phase-title-wrap">
+        <h2>reports-api — GraphQL Layer & Security</h2>
+        <p>Kotlin/Spring Boot receives request; JWT verified; resolver invoked</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">18</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> Spring Security validates internal JWT</div>
+            <div class="step-desc">The <code>JwtAuthenticationFilter</code> reads the <code>Authorization</code> header, verifies the JWT using <code>REMOTE_SCHEMA_JWT_SECRET</code>, and populates the Spring Security context with the authenticated user.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../security/JwtAuthenticationFilter.kt</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../security/JwtTokenProvider.kt</span>
+            </div>
+            <ul class="detail-list">
+              <li>Verifies JWT signature with <code>REMOTE_SCHEMA_JWT_SECRET</code> (same secret asurint-api used to sign)</li>
+              <li>Extracts <code>UserPrincipal</code> from JWT claims: emailAddress, personas, orgUnitId</li>
+              <li>Sets Spring SecurityContext: <code>SecurityContextHolder.getContext().setAuthentication(...)</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">19</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> GraphQL resolver → <code>ReportMutationResolver</code></div>
+            <div class="step-desc">DGS (Netflix DGS framework) routes the <code>createReport</code> mutation to the annotated Kotlin resolver method.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../resolvers/ReportMutationResolver.kt</span>
+            </div>
+            <div class="code-block"><span class="cm">// ReportMutationResolver.kt</span>
+@<span class="ty">DgsMutation</span>
+<span class="kw">fun</span> <span class="fn">createReport</span>(
+  @<span class="ty">InputArgument</span> reportRequest: <span class="ty">CreateReportInput</span>,
+  dfe: <span class="ty">DataFetchingEnvironment</span>
+): <span class="ty">Report</span> &#123;
+  <span class="kw">return</span> reportService.<span class="fn">createReport</span>(reportRequest, currentUser)
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 9 ═══ -->
+  <section class="phase" id="phase9">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,240,160,0.12);border:2px solid var(--tag-reports-border);color:var(--tag-reports-text)">9</div>
+      <div class="phase-title-wrap">
+        <h2>reports-api — Service Layer & Order Creation</h2>
+        <p>Business logic validates input, persists order draft, triggers Camunda process</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">20</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> <code>ReportService.createReport()</code></div>
+            <div class="step-desc">Service layer validates the input, checks package entitlements, resolves the org unit, generates a report number, and persists a draft order to PostgreSQL.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../services/ReportService.kt</span>
+            </div>
+            <ul class="detail-list">
+              <li>Validates <code>orgUnitId</code>, <code>packageId</code> — fetches package config from accounts-service</li>
+              <li>Generates <code>reportNumber</code> — unique identifier for this order</li>
+              <li>Persists draft <code>Report</code> entity to PostgreSQL with status <code>DRAFT</code></li>
+              <li>Saves <code>CandidateProfile</code> (with encrypted SSN) to <code>candidate_profiles</code> table</li>
+            </ul>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../repositories/ReportRepository.kt</span>
+              <span class="step-file"><span class="tag tag-db">db</span>PostgreSQL: reports, candidate_profiles tables</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">21</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> SSN encrypted and stored</div>
+            <div class="step-desc">The SSN is encrypted using AES-256 before persistence. The encrypted value is stored in the <code>candidate_profiles</code> table. It is never stored in plaintext.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../services/EncryptionService.kt</span>
+            </div>
+            <ul class="detail-list">
+              <li>AES-256 encryption key sourced from <code>ENCRYPTION_KEY</code> env var</li>
+              <li>Encrypted SSN stored in <code>candidate_profiles.ssn_encrypted</code> column</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">22</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> Kafka event: <code>Topics.domain.orders</code></div>
+            <div class="step-desc">After persisting the draft, reports-api publishes an Avro-serialised <code>OrderCreated</code> event to Kafka. orders-service (Camunda orchestrator) consumes this to start the BPMN workflow.</div>
+            <div class="kafka-badge">PRODUCE → Topics.domain.orders (Avro: OrderCreated)</div>
+            <ul class="detail-list">
+              <li>Avro schema registered with Confluent Schema Registry</li>
+              <li>Payload: reportNumber, orgUnitId, packageId, candidateProfileId, status=DRAFT</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 10 ═══ -->
+  <section class="phase" id="phase10">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,240,160,0.12);border:2px solid var(--tag-reports-border);color:var(--tag-reports-text)">10</div>
+      <div class="phase-title-wrap">
+        <h2>reports-api — Camunda BPMN Orchestration</h2>
+        <p>BPMN process instance started; service tasks delegate to Kotlin handlers</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">23</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> Camunda: <code>ssn-order-creation.bpmn</code> starts</div>
+            <div class="step-desc">The Camunda BPM engine starts a new process instance for the SSN order creation BPMN. Process variables are set from the <code>OrderCreated</code> event.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/resources/bpmn/ssn-order-creation.bpmn</span>
+            </div>
+            <ul class="detail-list">
+              <li>Process variables: <code>reportNumber, orgUnitId, packageId, candidateProfileId, ssnType</code></li>
+              <li>Camunda stores process state in PostgreSQL <code>act_*</code> tables (ACT_RU_EXECUTION, ACT_RU_TASK, etc.)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">24</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> BPMN Service Task: Validate Order</div>
+            <div class="step-desc">First service task validates business rules: package includes SSN trace, org unit has active billing, candidate data is complete.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../delegates/ValidateOrderDelegate.kt</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">25</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> BPMN Service Task: Resolve SSN Trace Type</div>
+            <div class="step-desc">Determines if this is a Level 1 (basic SSN trace) or Level 2 (FCRA consumer profile) search based on package configuration and state regulations.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../delegates/ResolveSsnTraceTypeDelegate.kt</span>
+            </div>
+            <ul class="detail-list">
+              <li><code>ssnType = SSN_TRACE_LEVEL_1</code> → BPS People Search (Accurint)</li>
+              <li><code>ssnType = SSN_TRACE_LEVEL_2</code> → FCRA Consumer Profile (RiskView)</li>
+              <li>Sets <code>ssnType</code> Camunda process variable for downstream routing</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 11 ═══ -->
+  <section class="phase" id="phase11">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,240,160,0.12);border:2px solid var(--tag-reports-border);color:var(--tag-reports-text)">11</div>
+      <div class="phase-title-wrap">
+        <h2>reports-api → Kafka → lexisnexis-service</h2>
+        <p>BPMN publishes GetAccurintBackground event; lexisnexis-service consumes it</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">26</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> BPMN publishes to <code>Topics.query.lexisnexis</code></div>
+            <div class="step-desc">The Camunda service task for SSN lookup publishes a <code>GetAccurintBackground</code> Avro message to Kafka. This is an asynchronous request-reply pattern — the BPMN process parks waiting for the response.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/kotlin/.../delegates/RequestSsnTraceDelegate.kt</span>
+            </div>
+            <div class="kafka-badge">PRODUCE → Topics.query.lexisnexis (Avro: GetAccurintBackground)</div>
+            <div class="code-block"><span class="cm">// GetAccurintBackground Avro payload</span>
+&#123;
+  reportNumber: <span class="str">"RPT-20240101-001"</span>,
+  correlationId: <span class="str">"uuid-..."</span>,
+  ssnType: <span class="str">"SSN_TRACE_LEVEL_1"</span>,  <span class="cm">// or SSN_TRACE_LEVEL_2</span>
+  ssn: <span class="str">"XXX-XX-XXXX"</span>,          <span class="cm">// decrypted for in-flight use</span>
+  firstName: <span class="str">"John"</span>,
+  lastName: <span class="str">"Doe"</span>,
+  dateOfBirth: <span class="str">"1980-01-15"</span>
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">27</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> BPMN process parks at intermediate catch event</div>
+            <div class="step-desc">The Camunda process waits for the <code>AccurintBackgroundResult</code> correlation message to arrive. The process is suspended (not blocking a thread) — Camunda persists state to PostgreSQL.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-reports">reports-api</span>reports-api/src/main/resources/bpmn/ssn-order-creation.bpmn (IntermediateCatchEvent: ReceiveSsnTraceResult)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 12 ═══ -->
+  <section class="phase" id="phase12">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(240,160,91,0.12);border:2px solid var(--tag-lexis-border);color:var(--tag-lexis-text)">12</div>
+      <div class="phase-title-wrap">
+        <h2>lexisnexis-service — Kafka Consumer & Routing</h2>
+        <p>Kotlin service consumes Kafka message, checks cache, routes to Level 1 or Level 2 SOAP handler</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">28</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-lexis">lexisnexis</span> <code>GetAccurintBackgroundTransformHandler</code> consumes message</div>
+            <div class="step-desc">Kafka consumer group in lexisnexis-service receives the <code>GetAccurintBackground</code> Avro message from <code>Topics.query.lexisnexis</code>.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/kotlin/.../handlers/GetAccurintBackgroundTransformHandler.kt</span>
+            </div>
+            <div class="kafka-badge">CONSUME ← Topics.query.lexisnexis (Avro: GetAccurintBackground)</div>
+            <div class="code-block"><span class="cm">// GetAccurintBackgroundTransformHandler.kt — routing logic</span>
+<span class="kw">when</span> (message.ssnType) &#123;
+  <span class="ty">SSN_TRACE_LEVEL_1</span>, <span class="kw">null</span> ->
+    accurintClient.<span class="fn">searchBackground</span>(message)  <span class="cm">// BPS Level 1</span>
+  <span class="ty">SSN_TRACE_LEVEL_2</span> ->
+    ssn2Handler.<span class="fn">handle</span>(message)              <span class="cm">// FCRA Level 2</span>
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">29</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-lexis">lexisnexis</span> <code>AccurintClient</code> — PostgreSQL cache check</div>
+            <div class="step-desc">Before making a SOAP call, the client checks the local PostgreSQL cache. If a recent result exists (within 30 days) for the same SSN + search parameters, it's returned immediately.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/kotlin/.../clients/AccurintClient.kt</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-db">db</span>PostgreSQL: bps_search_records table (30-day TTL)</span>
+            </div>
+            <ul class="detail-list">
+              <li>Cache key: hash of SSN + firstName + lastName + dateOfBirth</li>
+              <li>If cache hit: returns cached <code>BpsSearchResponse</code> immediately (no SOAP call)</li>
+              <li>If cache miss: proceeds to SOAP call (next step)</li>
+              <li><code>@Retryable(value=[ClientTransportException::class], maxAttempts=3, backoff=5s)</code> wraps the SOAP call</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 13 ═══ -->
+  <section class="phase" id="phase13">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(240,160,91,0.12);border:2px solid var(--tag-lexis-border);color:var(--tag-lexis-text)">13</div>
+      <div class="phase-title-wrap">
+        <h2>lexisnexis-service — Accurint SOAP Calls</h2>
+        <p>Spring-WS makes SOAP requests to Accurint BPS (Level 1) or RiskView FCRA (Level 2)</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">30</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-lexis">lexisnexis</span> Level 1: <code>BpsPeopleWsService.search()</code> — SOAP POST</div>
+            <div class="step-desc">Spring-WS <code>WebServiceGatewaySupport</code> marshals the request to SOAP XML and POSTs to the Accurint BPS People Search endpoint. HTTP Basic auth with configured username/password.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/kotlin/.../services/ssnTrace/BpsPeopleWsService.kt</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/resources/wsdl/WsAccurintPeople-BpsSearch.wsdl</span>
+            </div>
+            <div class="http-badge">SOAP POST https://wsonline.seisint.com/WsAccurintPeople?ver_=2.2<br>
+SOAPAction: "WsAccurintPeople/BpsSearch?ver_=2.2"<br>
+Authorization: Basic &lt;ACCURINT_USERNAME:ACCURINT_PASSWORD&gt;</div>
+            <div class="code-block"><span class="cm">// BpsSearchRequest structure</span>
+<span class="ty">BpsSearchRequest</span> &#123;
+  user: &#123; glbPurpose: <span class="str">"11"</span>, dlPurpose: <span class="str">"3"</span> &#125;,
+  options: &#123;
+    returnCount: <span class="num">2000</span>,
+    isUseNicknames: <span class="kw">true</span>,
+    isIncludePriorAddresses: <span class="kw">true</span>
+  &#125;,
+  searchBy: &#123; name, dob, ssn &#125;
+&#125;</div>
+            <ul class="detail-list">
+              <li>WSDL: <code>WsAccurintPeople-BpsSearch.wsdl</code> — defines BpsSearch SOAP operation</li>
+              <li>Env: <code>ACCURINT_USERNAME</code>, <code>ACCURINT_PASSWORD</code>, <code>ACCURINT_TARGETURL_OVERRIDE</code></li>
+              <li>Error code "203" → <code>BpsPeopleWsSubjectException</code> (too many subjects → returns empty list)</li>
+              <li>Other errors → <code>BpsPeopleWsInvalidException</code> → triggers @Retryable (3x, 5s backoff)</li>
+              <li>Mock support: <code>ACCURINT_MOCK_TEST_DATA=true</code> → returns synthetic test data</li>
+            </ul>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/kotlin/.../config/AccurintConfig.kt</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">31</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-lexis">lexisnexis</span> Level 1: <code>BpsPeopleSearchMapper</code> maps SOAP response</div>
+            <div class="step-desc">Raw SOAP response is unmarshalled and mapped to a list of <code>DetailedTraceResult</code> domain objects.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/kotlin/.../services/ssnTrace/BpsPeopleSearchMapper.kt</span>
+            </div>
+            <div class="code-block"><span class="cm">// BpsPeopleSearchMapper.kt</span>
+<span class="kw">fun</span> <span class="fn">mapToDetailedTraceResults</span>(response: <span class="ty">BpsSearchResponse</span>): <span class="ty">List</span>&lt;<span class="ty">DetailedTraceResult</span>&gt; &#123;
+  <span class="cm">// Maps each subject to: name, dob, age, gender,</span>
+  <span class="cm">// dateFirstSeen, dateLastSeen,</span>
+  <span class="cm">// addresses (with isCurrentAddress flag),</span>
+  <span class="cm">// ssnInfo.valid, deceased flag,</span>
+  <span class="cm">// ssnIssuedDateYear</span>
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">32</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-lexis">lexisnexis</span> Level 2 (FCRA): <code>SearchSsn2Handler</code> → RiskView SOAP</div>
+            <div class="step-desc">For Level 2 requests, a different SOAP endpoint is called: LexisNexis RiskView FCRA Consumer Profile Report. Returns richer data including aliases, high-risk indicators, and FCRA-compliant input confirmation.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/kotlin/.../handlers/commands/SearchSsn2Handler.kt</span>
+            </div>
+            <div>
+              <span class="step-file"><span class="tag tag-lexis">lexisnexis</span>lexisnexis-service/src/main/resources/wsdl/WsRiskView-FCRAConsumerProfileReport.wsdl</span>
+            </div>
+            <div class="http-badge">SOAP POST https://riskview.riskwise.com/WsRiskView/FCRAConsumerProfileReport?ver_=2.21</div>
+            <ul class="detail-list">
+              <li>Response mapped to <code>SsnTraceLevel2Result</code> Avro: name, addresses, aliases, alerts, highRiskIndicators, inputConfirmation</li>
+              <li>Results cached in <code>consumer_profile_report</code> PostgreSQL table</li>
+            </ul>
+            <div>
+              <span class="step-file"><span class="tag tag-db">db</span>PostgreSQL: consumer_profile_report table</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">33</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-lexis">lexisnexis</span> Publishes <code>AccurintBackgroundResult</code> to Kafka</div>
+            <div class="step-desc">After successful SOAP response (or cache hit), lexisnexis-service publishes the result back to the same Kafka topic. reports-api Camunda process is correlated and resumes.</div>
+            <div class="kafka-badge">PRODUCE → Topics.query.lexisnexis (Avro: AccurintBackgroundResult)</div>
+            <ul class="detail-list">
+              <li>Correlation: <code>reportNumber</code> + <code>correlationId</code> match the original request</li>
+              <li>Result also cached in PostgreSQL for future cache hits</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 14 ═══ -->
+  <section class="phase" id="phase14">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(91,240,91,0.08);border:2px solid #3abf3a;color:#5bf05b">14</div>
+      <div class="phase-title-wrap">
+        <h2>Response Propagation — Back to the Browser</h2>
+        <p>Result flows back: Kafka → Camunda → reports-api → asurint-api → browser</p>
+      </div>
+    </div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">34</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> Camunda resumes; processes SSN trace result</div>
+            <div class="step-desc">When the Kafka response arrives, the Camunda intermediate catch event fires. The BPMN continues: stores trace results, updates report status to <code>COMPLETE</code> or <code>IN_REVIEW</code>.</div>
+            <ul class="detail-list">
+              <li>SSN trace results stored in <code>ssn_trace_results</code> table</li>
+              <li>Report status updated: DRAFT → PENDING → (async) COMPLETE</li>
+              <li>BPMN publishes <code>Topics.domain.reports</code> event for other services (notifications, billing)</li>
+            </ul>
+            <div class="kafka-badge">PRODUCE → Topics.domain.reports (Avro: ReportStatusChanged)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">35</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-reports">reports-api</span> GraphQL mutation returns initial response</div>
+            <div class="step-desc">The initial <code>createReport</code> mutation returns synchronously with the draft order details. The SSN trace runs asynchronously via Kafka.</div>
+            <div class="code-block"><span class="cm">// GraphQL response (synchronous — before SSN trace completes)</span>
+&#123;
+  <span class="str">"data"</span>: &#123;
+    <span class="str">"createReport"</span>: &#123;
+      <span class="str">"status"</span>: <span class="str">"DRAFT"</span>,
+      <span class="str">"reportNumber"</span>: <span class="str">"RPT-20240101-001"</span>,
+      <span class="str">"receivedOn"</span>: <span class="str">"2024-01-01T10:00:00Z"</span>,
+      <span class="str">"dueOn"</span>: <span class="str">"2024-01-03T10:00:00Z"</span>,
+      <span class="str">"subject"</span>: &#123; <span class="str">"name"</span>: &#123; <span class="str">"firstName"</span>: <span class="str">"John"</span>, <span class="str">"lastName"</span>: <span class="str">"Doe"</span> &#125; &#125;
+    &#125;
+  &#125;
+&#125;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">36</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-asurint">asurint-api</span> Response forwarded to browser</div>
+            <div class="step-desc">asurint-api receives the reports-api GraphQL response and forwards it as-is back to the browser (no transformation needed for the response).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-header">
+          <div class="step-num">37</div>
+          <div class="step-content">
+            <div class="step-title"><span class="tag tag-ui">ui</span> Post-mutation navigation</div>
+            <div class="step-desc">On mutation success, the UI calls <code>ssnTraceIndividuals(reportNumber)</code> and navigates to the order edit page.</div>
+            <div>
+              <span class="step-file"><span class="tag tag-ui">ui</span>ui/src/apps/client/modules/Reports/pages/CreateReport/components/EnterDetailsForm/hooks.ts</span>
+            </div>
+            <div class="code-block"><span class="cm">// hooks.ts — post-mutation (lines ~1050+)</span>
+<span class="kw">await</span> <span class="fn">ssnTraceIndividuals</span>(reportNumber);
+navigate(<span class="str">`/orders/edit/$&#123;reportNumber&#125;?isDraftOrder=true`</span>);</div>
+            <ul class="detail-list">
+              <li>User is taken to the order edit page where they can review SSN trace results as they arrive</li>
+              <li>The page polls or uses subscriptions for real-time status updates</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ ARCH MAP ═══ -->
+  <section class="phase" id="arch">
+    <div class="phase-header">
+      <div class="phase-num" style="background:rgba(136,144,176,0.15);border:2px solid var(--border);color:var(--text-muted)">★</div>
+      <div class="phase-title-wrap">
+        <h2>Microservice Architecture Map</h2>
+        <p>All services involved in SSN order creation with tech stacks and Kafka topics</p>
+      </div>
+    </div>
+    <div class="arch-grid">
+
+      <div class="arch-card" style="border-color:var(--tag-ui-border)">
+        <div class="arch-card-title" style="color:var(--tag-ui-text)">🖥️ ui</div>
+        <div class="arch-card-tech">React 18 · TypeScript · Apollo Client · Formik · Redux · Okta</div>
+        <div class="arch-card-role">Browser SPA — order creation UI, SSN entry, package selection, form validation</div>
+        <div class="arch-card-topics">→ POST /public/graphql (HTTP)</div>
+      </div>
+
+      <div class="arch-card" style="border-color:var(--tag-asurint-border)">
+        <div class="arch-card-title" style="color:var(--tag-asurint-text)">🔀 asurint-api</div>
+        <div class="arch-card-tech">Node.js · TypeScript · Apollo Server 4.12.2 · Express · @graphql-tools/stitch · @okta/jwt-verifier</div>
+        <div class="arch-card-role">GraphQL Gateway — schema stitching from 17 services, Okta JWT validation, JWT re-signing, persona enforcement</div>
+        <div class="arch-card-topics">Endpoints: /private/graphql · /public/graphql</div>
+      </div>
+
+      <div class="arch-card" style="border-color:var(--tag-reports-border)">
+        <div class="arch-card-title" style="color:var(--tag-reports-text)">📋 reports-api</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · DGS GraphQL · Camunda BPM · PostgreSQL · Kafka/Avro</div>
+        <div class="arch-card-role">Core reporting engine — order creation, BPMN orchestration, SSN encryption, result aggregation</div>
+        <div class="arch-card-topics">Topics: query.lexisnexis · domain.orders · domain.reports</div>
+      </div>
+
+      <div class="arch-card" style="border-color:var(--tag-lexis-border)">
+        <div class="arch-card-title" style="color:var(--tag-lexis-text)">🔍 lexisnexis-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · Spring-WS · SOAP/WSDL · PostgreSQL cache · @Retryable</div>
+        <div class="arch-card-role">LexisNexis/Accurint SOAP adapter — SSN trace Level 1 (BPS) and Level 2 (FCRA RiskView)</div>
+        <div class="arch-card-topics">Topics: query.lexisnexis (consume+produce)</div>
+      </div>
+
+      <div class="arch-card" style="border-color:var(--tag-orders-border)">
+        <div class="arch-card-title" style="color:var(--tag-orders-text)">⚙️ orders-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · Camunda BPM · PostgreSQL · Kafka</div>
+        <div class="arch-card-role">Order lifecycle orchestrator — processes order events, manages status transitions</div>
+        <div class="arch-card-topics">Topics: domain.orders (consume+produce)</div>
+      </div>
+
+      <div class="arch-card" style="border-color:#3abf7a">
+        <div class="arch-card-title" style="color:#5bf0a0">🔐 accounts-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · Okta · PostgreSQL</div>
+        <div class="arch-card-role">User/org management — Okta user sync, org unit config, package entitlements, JWT issuance</div>
+        <div class="arch-card-topics">Called via GraphQL (stitched into asurint-api)</div>
+      </div>
+
+      <div class="arch-card" style="border-color:#3abf7a">
+        <div class="arch-card-title" style="color:#5bf0a0">💰 billing-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · PostgreSQL · Kafka</div>
+        <div class="arch-card-role">Billing — order invoicing, package pricing, payment processing</div>
+        <div class="arch-card-topics">Topics: domain.billing · domain.orders</div>
+      </div>
+
+      <div class="arch-card" style="border-color:#3abf7a">
+        <div class="arch-card-title" style="color:#5bf0a0">🔔 notifications-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · SendGrid · Twilio · Kafka</div>
+        <div class="arch-card-role">Candidate & employer notifications — email/SMS for order status, candidate invite</div>
+        <div class="arch-card-topics">Topics: domain.reports · domain.orders</div>
+      </div>
+
+      <div class="arch-card" style="border-color:#3abf7a">
+        <div class="arch-card-title" style="color:#5bf0a0">📍 sourcing-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · PostgreSQL</div>
+        <div class="arch-card-role">Address resolution — FIPS codes, address normalisation for criminal jurisdiction routing</div>
+        <div class="arch-card-topics">Topics: query.sourcing</div>
+      </div>
+
+      <div class="arch-card" style="border-color:#bf3a3a">
+        <div class="arch-card-title" style="color:#f05b5b">⚖️ criminal-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · Kafka · PostgreSQL</div>
+        <div class="arch-card-role">Criminal record search — county, state, federal searches triggered after address resolution</div>
+        <div class="arch-card-topics">Topics: query.criminal · domain.reports</div>
+      </div>
+
+      <div class="arch-card" style="border-color:#bf3a3a">
+        <div class="arch-card-title" style="color:#f05b5b">🕵️ screening-service</div>
+        <div class="arch-card-tech">Kotlin · Spring Boot · Kafka · PostgreSQL</div>
+        <div class="arch-card-role">Additional screening checks — employment, education, MVR verification coordination</div>
+        <div class="arch-card-topics">Topics: domain.orders · query.screening</div>
+      </div>
+
+      <div class="arch-card" style="border-color:var(--tag-kafka-border)">
+        <div class="arch-card-title" style="color:var(--tag-kafka-text)">📨 Kafka / Schema Registry</div>
+        <div class="arch-card-tech">Apache Kafka · Avro · Confluent Schema Registry</div>
+        <div class="arch-card-role">Async message bus — all inter-service communication uses Avro-serialised messages with registered schemas</div>
+        <div class="arch-card-topics">All Topics: query.*, domain.*, events.*</div>
+      </div>
+
+    </div>
+
+    <!-- Full flow summary -->
+    <div class="info-box" style="margin-top:24px">
+      <strong>Complete SSN Order Creation Call Chain:</strong><br><br>
+      <code style="font-size:11px;line-height:2">
+      Browser → [ui] setupApolloClient.ts (Okta JWT) → POST /public/graphql<br>
+      → [asurint-api] index.ts (Express middleware) → auth/index.ts (Okta verify) → context.ts (UserPrincipal)<br>
+      → [asurint-api] schemas/index.ts (stitch) → RemoteSchemaBuilder.ts → authLink.ts (JWT re-sign)<br>
+      → POST [reports-api]/graphql (internal JWT)<br>
+      → [reports-api] JwtAuthFilter → ReportMutationResolver → ReportService → EncryptionService (SSN encrypt)<br>
+      → PostgreSQL (draft order saved) → Kafka PRODUCE Topics.domain.orders<br>
+      → [reports-api] Camunda ssn-order-creation.bpmn → RequestSsnTraceDelegate<br>
+      → Kafka PRODUCE Topics.query.lexisnexis (GetAccurintBackground Avro)<br>
+      → [lexisnexis-service] GetAccurintBackgroundTransformHandler → AccurintClient (PostgreSQL cache check)<br>
+      → [lexisnexis-service] BpsPeopleWsService → SOAP POST wsonline.seisint.com (Accurint Level 1)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;OR Ssn2WsService → SOAP POST riskview.riskwise.com (FCRA Level 2)<br>
+      → BpsPeopleSearchMapper (response mapping) → PostgreSQL cache write<br>
+      → Kafka PRODUCE Topics.query.lexisnexis (AccurintBackgroundResult Avro)<br>
+      → [reports-api] Camunda IntermediateCatchEvent resumes → results stored → report status COMPLETE<br>
+      → Kafka PRODUCE Topics.domain.reports → [notifications-service] sends email/SMS<br>
+      → GraphQL response → [asurint-api] → browser<br>
+      → [ui] navigate /orders/edit/{reportNumber}
+      </code>
+    </div>
+  </section>
+
+</main>
+</div>
+</body>
+</html>
